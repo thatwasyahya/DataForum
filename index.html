@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistiques Forum</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        canvas { max-width: 800px; margin: 50px auto; }
+    </style>
+</head>
+<body>
+    <h1>Statistiques par Forum</h1>
+    
+    <!-- Liste déroulante pour sélectionner un forum -->
+    <select id="forumSelect" onchange="fetchStats()">
+        <option value="">Sélectionner un forum</option>
+        <!-- Liste des forums à charger dynamiquement -->
+    </select>
+
+    <!-- Graphique radar pour afficher les statistiques -->
+    <canvas id="statsRadar"></canvas>
+
+    <h2>Qualité :</h2>
+    <div id="quality"></div>
+
+    <script>
+        async function fetchStats() {
+            const forumId = document.getElementById('forumSelect').value;
+            if (forumId) {
+                try {
+                    const response = await fetch(`http://localhost:9090/api/stats/${forumId}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch stats');
+                    }
+                    const stats = await response.json();
+                    updateChart(stats);
+                    displayQuality(stats);
+                } catch (error) {
+                    console.error('Error fetching stats:', error);
+                    alert('Error fetching forum statistics. Please try again later.');
+                }
+            }
+        }
+
+        function updateChart(stats) {
+            const ctx = document.getElementById('statsRadar').getContext('2d');
+            const chartData = {
+                labels: ['Total Interaction Time', 'User Interaction Time', 'Average Interactions Percentage', 'Leaders Percentage', 'Reactives Percentage'],
+                datasets: [{
+                    label: 'Forum Stats',
+                    data: [
+                        stats['Total Interaction Time'],
+                        stats['User Interaction Time'],
+                        stats['Average Interactions Percentage'],
+                        stats['Leaders Percentage'],
+                        stats['Reactives Percentage']
+                    ],
+                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    borderWidth: 1
+                }]
+            };
+
+
+            const options = {
+                scales: {
+                    r: {
+                        angleLines: { display: false },
+                        suggestedMin: 0,
+                        suggestedMax: 100
+                    }
+                }
+            };
+
+            const chart = new Chart(ctx, {
+                type: 'radar',
+                data: chartData,
+                options: options
+            });
+        }
+
+        function displayQuality(stats) {
+            const quality = stats['Qualité'];
+            document.getElementById('quality').innerText = `Qualité : ${quality.toFixed(2)}%`;
+        }
+
+        async function loadForums() {
+            try {
+                const response = await fetch('http://localhost:9090/api/forums');
+                const forums = await response.json();
+                console.log(forums);  // Log the response to see its structure
+                if (Array.isArray(forums)) {
+                    const select = document.getElementById('forumSelect');
+                    forums.forEach(forum => {
+                        const option = document.createElement('option');
+                        option.value = forum.id;
+                        option.textContent = `Forum ${forum.id}`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    console.error("Forums is not an array", forums);
+                }
+            } catch (error) {
+                console.error("Error loading forums:", error);
+            }
+        }
+
+
+        loadForums();
+    </script>
+</body>
+</html>
