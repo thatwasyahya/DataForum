@@ -3,111 +3,253 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Statistiques Forum</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Statistiques des Forums</title>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
     <style>
-        canvas { max-width: 800px; margin: 50px auto; }
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            background-color: #6c5ce7;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .selectors {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        select {
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 10px #6c5ce7;
+        }
+
+        #chart-main {
+            width: 95%;
+            max-width: 1200px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .top3{
+            padding: 12px 15px;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        #top-charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .top-chart {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .top-chart:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            margin-top: 20px;
+            background-color: #6c5ce7;
+            color: white;
+            font-size: 14px;
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body>
-    <h1>Statistiques par Forum</h1>
-    
-    <!-- Liste déroulante pour sélectionner un forum -->
-    <select id="forumSelect" onchange="fetchStats()">
-        <option value="">Sélectionner un forum</option>
-        <!-- Liste des forums à charger dynamiquement -->
-    </select>
 
-    <!-- Graphique radar pour afficher les statistiques -->
-    <canvas id="statsRadar"></canvas>
+<header>Comparaison des Performances des Forums</header>
 
-    <h2>Qualité :</h2>
-    <div id="quality"></div>
+<div class="selectors">
+    <select id="forum-selector-1"></select>
+    <select id="forum-selector-2"></select>
+</div>
 
-    <script>
-        async function fetchStats() {
-            const forumId = document.getElementById('forumSelect').value;
-            if (forumId) {
-                try {
-                    const response = await fetch(`http://localhost:9090/api/stats/${forumId}`);
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch stats');
-                    }
-                    const stats = await response.json();
-                    updateChart(stats);
-                    displayQuality(stats);
-                } catch (error) {
-                    console.error('Error fetching stats:', error);
-                    alert('Error fetching forum statistics. Please try again later.');
-                }
-            }
-        }
+<!-- Conteneur principal pour les graphiques -->
+<div id="chart-main"></div>
+<div class="top3"><h2>Top 3 Forums</h2></div>
+<div id="top-charts-container"></div>
 
-        function updateChart(stats) {
-            const ctx = document.getElementById('statsRadar').getContext('2d');
-            const chartData = {
-                labels: ['Total Interaction Time', 'User Interaction Time', 'Average Interactions Percentage', 'Leaders Percentage', 'Reactives Percentage'],
-                datasets: [{
-                    label: 'Forum Stats',
-                    data: [
-                        stats['Total Interaction Time'],
-                        stats['User Interaction Time'],
-                        stats['Average Interactions Percentage'],
-                        stats['Leaders Percentage'],
-                        stats['Reactives Percentage']
-                    ],
-                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                    borderColor: 'rgba(0, 123, 255, 1)',
-                    borderWidth: 1
-                }]
-            };
+<footer>&copy; 2024 | Statistiques Forums - Outil d'analyse</footer>
 
-
-            const options = {
-                scales: {
-                    r: {
-                        angleLines: { display: false },
-                        suggestedMin: 0,
-                        suggestedMax: 100
-                    }
-                }
-            };
-
-            const chart = new Chart(ctx, {
-                type: 'radar',
-                data: chartData,
-                options: options
+<script>
+function loadAndCreateCharts() {
+    fetch('forum_stats.csv')
+        .then(response => response.text())
+        .then(data => {
+            const rows = data.trim().split('\n').map(row => row.split(','));
+            const headers = rows.shift();
+            const forumsData = rows.map(row => {
+                return headers.reduce((acc, header, index) => {
+                    acc[header.trim()] = row[index].trim();
+                    return acc;
+                }, {});
             });
-        }
 
-        function displayQuality(stats) {
-            const quality = stats['Qualité'];
-            document.getElementById('quality').innerText = `Qualité : ${quality.toFixed(2)}%`;
-        }
+            const sortedForums = forumsData.sort((a, b) => parseFloat(b['Quality Score (%)']) - parseFloat(a['Quality Score (%)']));
 
-        async function loadForums() {
-            try {
-                const response = await fetch('http://localhost:9090/api/forums');
-                const forums = await response.json();
-                console.log(forums);  // Log the response to see its structure
-                if (Array.isArray(forums)) {
-                    const select = document.getElementById('forumSelect');
-                    forums.forEach(forum => {
-                        const option = document.createElement('option');
-                        option.value = forum.id;
-                        option.textContent = `Forum ${forum.id}`;
-                        select.appendChild(option);
-                    });
-                } else {
-                    console.error("Forums is not an array", forums);
-                }
-            } catch (error) {
-                console.error("Error loading forums:", error);
+            const forumSelector1 = document.getElementById('forum-selector-1');
+            const forumSelector2 = document.getElementById('forum-selector-2');
+
+            forumsData.forEach(forum => {
+                const option1 = document.createElement('option');
+                const option2 = document.createElement('option');
+                option1.value = forum['Forum ID'];
+                option1.text = `Forum ${forum['Forum ID']} - Qualité: ${parseFloat(forum['Quality Score (%)']).toFixed(2)}%`;
+                option2.value = forum['Forum ID'];
+                option2.text = option1.text;
+
+                forumSelector1.appendChild(option1);
+                forumSelector2.appendChild(option2);
+            });
+
+            forumSelector1.value = sortedForums[0]['Forum ID'];
+            forumSelector2.value = sortedForums[1]['Forum ID'];
+
+            updateComparisonChart(forumsData);
+
+            const topChartsContainer = document.getElementById('top-charts-container');
+            for (let i = 0; i < 3; i++) {
+                const chartContainer = document.createElement('div');
+                chartContainer.className = 'top-chart';
+                chartContainer.id = `top-chart-${i + 1}`;
+                topChartsContainer.appendChild(chartContainer);
+                createChart(chartContainer.id, sortedForums[i]);
             }
-        }
 
+            forumSelector1.addEventListener('change', () => updateComparisonChart(forumsData));
+            forumSelector2.addEventListener('change', () => updateComparisonChart(forumsData));
+        });
+}
 
-        loadForums();
-    </script>
+function createChart(containerId, forum) {
+    Highcharts.chart(containerId, {
+        chart: {
+            polar: true,
+            type: 'line'
+        },
+        title: {
+            text: `Forum ${forum['Forum ID']} - Qualité: ${parseFloat(forum['Quality Score (%)']).toFixed(2)}%`
+        },
+        xAxis: {
+            categories: [
+                "Temps d'interaction total", "Temps d'interaction utilisateur",
+                "Pourcentage moyen d'interactions", "Nombre de leaders",
+                "Nombre de réactifs"
+            ],
+            tickmarkPlacement: 'on',
+            lineWidth: 0
+        },
+        yAxis: {
+            min: 0,
+            max: 100
+        },
+        series: [{
+            name: `Forum ${forum['Forum ID']}`,
+            data: [
+                parseFloat(forum['Total Interaction Time (%)']),
+                parseFloat(forum['User Interaction Time (%)']),
+                parseFloat(forum['Average Interactions Percentage (%)']),
+                parseFloat(forum['Leaders Count (%)']),
+                parseFloat(forum['Reactives Count (%)'])
+            ]
+        }]
+    });
+}
+
+function updateComparisonChart(forumsData) {
+    const forumId1 = document.getElementById('forum-selector-1').value;
+    const forumId2 = document.getElementById('forum-selector-2').value;
+
+    const forum1 = forumsData.find(f => f['Forum ID'] === forumId1);
+    const forum2 = forumsData.find(f => f['Forum ID'] === forumId2);
+
+    Highcharts.chart('chart-main', {
+        chart: {
+            polar: true,
+            type: 'line'
+        },
+        title: {
+            text: `Comparaison Forum ${forum1['Forum ID']} et Forum ${forum2['Forum ID']}`
+        },
+        xAxis: {
+            categories: [
+                "Temps d'interaction total", "Temps d'interaction utilisateur",
+                "Pourcentage moyen d'interactions", "Nombre de leaders",
+                "Nombre de réactifs"
+            ]
+        },
+        yAxis: {
+            min: 0,
+            max: 100
+        },
+        series: [{
+            name: `Forum ${forum1['Forum ID']}`,
+            data: [
+                parseFloat(forum1['Total Interaction Time (%)']),
+                parseFloat(forum1['User Interaction Time (%)']),
+                parseFloat(forum1['Average Interactions Percentage (%)']),
+                parseFloat(forum1['Leaders Count (%)']),
+                parseFloat(forum1['Reactives Count (%)'])
+            ]
+        }, {
+            name: `Forum ${forum2['Forum ID']}`,
+            data: [
+                parseFloat(forum2['Total Interaction Time (%)']),
+                parseFloat(forum2['User Interaction Time (%)']),
+                parseFloat(forum2['Average Interactions Percentage (%)']),
+                parseFloat(forum2['Leaders Count (%)']),
+                parseFloat(forum2['Reactives Count (%)'])
+            ]
+        }]
+    });
+}
+
+loadAndCreateCharts();
+</script>
+
 </body>
 </html>
